@@ -12,16 +12,25 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  # Replace this with your lowercase image name if you want a custom package name.
-  IMAGE_NAME: your-image-name
+  IMAGE_NAME: hw_vpe03_githubactions
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    outputs:
+      image_full_name: ${{ steps.meta.outputs.image_full_name }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Normalize image name
+        id: meta
+        shell: bash
+        run: |
+          IMAGE_NAMESPACE="${GITHUB_REPOSITORY_OWNER,,}"
+          IMAGE_NAME_LOWER="${IMAGE_NAME,,}"
+          echo "image_full_name=${REGISTRY}/${IMAGE_NAMESPACE}/${IMAGE_NAME_LOWER}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -40,8 +49,8 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+            ${{ steps.meta.outputs.image_full_name }}:latest
+            ${{ steps.meta.outputs.image_full_name }}:sha-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -55,7 +64,7 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         env:
           REGISTRY: ${{ env.REGISTRY }}
-          IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
+          IMAGE: ${{ needs.build-and-push.outputs.image_full_name }}:latest
           GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
           GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
         with:
